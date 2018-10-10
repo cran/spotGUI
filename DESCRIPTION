@@ -1,7 +1,7 @@
 Package: spotGUI
 Type: Package
 Title: Graphical User Interface for the Package 'SPOT'
-Version: 0.2.0
+Version: 0.2.1
 Authors@R: c(
         person("Frederik","Rehbach", role = c("aut", "cre"), email = "frederik.rehbach@th-koeln.de"),
         person("Martin", "Zaefferer", role = "aut"),
@@ -19,13 +19,13 @@ Description: A graphical user interface for the Sequential Parameter Optimizatio
 License: GPL (>= 2)
 Encoding: UTF-8
 LazyData: true
-Depends: R (>= 3.1.0), smoof
-Imports: shinyBS, shiny, shinydashboard, SPOT (>= 2.0.3), gridExtra,
+Depends: R (>= 3.1.0), shinyBS
+Imports: smoof, shiny, shinydashboard, SPOT (>= 2.0.3), gridExtra,
         shinyjs, rhandsontable, XML, rclipboard, plotly, tools, httpuv,
         methods
-Suggests: roxygen2, testthat, shinytest, devtools
+Suggests: testthat, shinytest, devtools
 RoxygenNote: 6.0.1
 NeedsCompilation: no
-Packaged: 2018-05-31 13:09:43 UTC; rehbach
+Packaged: 2018-10-10 09:04:41 UTC; rehbach
 Repository: CRAN
-Date/Publication: 2018-06-01 22:19:49 UTC
+Date/Publication: 2018-10-10 09:30:02 UTC
