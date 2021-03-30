@@ -1,0 +1,24 @@
+<%
+dir <- "/"
+log.file = substring(log.file, 2, nchar(log.file))
+log.file = paste0(dir,log.file)
+-%>
+#!/bin/bash
+#SBATCH --job-name=<%= job.name %>
+#SBATCH --output=<%= log.file %>
+#SBATCH --error=<%= log.file %>
+#SBATCH --time=100
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=512
+#SBATCH --partition=gecco
+
+## Run R:
+## we merge R output with stdout from SLURM, which gets then logged via --output option
+
+PATH=/opt/software/R/R-current/bin:/opt/software/scripts:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+
+echo $PATH
+echo $SHELL
+which R
+Rscript -e 'batchtools::doJobCollection("<%= uri %>")'

@@ -4,7 +4,9 @@
 \name{packageDataEnv}
 \alias{packageDataEnv}
 \title{Package Data Environment}
-\format{An object of class \code{environment} of length 0.}
+\format{
+An object of class \code{environment} of length 0.
+}
 \usage{
 packageDataEnv
 }

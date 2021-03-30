@@ -4,7 +4,9 @@
 \name{LIST_ITEMS_PER_ROW}
 \alias{LIST_ITEMS_PER_ROW}
 \title{List Items per row in R-Code Exports}
-\format{An object of class \code{numeric} of length 1.}
+\format{
+An object of class \code{numeric} of length 1.
+}
 \usage{
 LIST_ITEMS_PER_ROW
 }

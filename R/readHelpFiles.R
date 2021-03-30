@@ -94,7 +94,9 @@ getAllHelpControlListParams <- function(methodName, directSpotControl = NULL){
     if(is.null(directSpotControl)){
         ctrl <- getMethodHelpControlList(methodName)[[2]]
     }else{
-        ctrl <- directSpotControl[[8]]
+        #ctrl <- directSpotControl[[8]]
+        #browser()
+        ctrl <- directSpotControl[[which.max(lapply(directSpotControl, length))]]
     }
 
     #This list should be somewhat controlled and or updated with the spot helpfiles
@@ -195,10 +197,12 @@ getAllHelpControlListParams <- function(methodName, directSpotControl = NULL){
 #'
 #' @keywords internal
 getHelpSpotControlParameters <- function(){
+    #browser()
     rd <- getMethodHelp("SPOT", "spotControl")
     if(!is.null(rd)){
         for(i in 1:length(rd)){
-            if(attr(rd[[i]],"Rd_tag") == "\\description"){
+            #if(attr(rd[[i]],"Rd_tag") == "\\description"){
+            if(attr(rd[[i]],"Rd_tag") == "\\details"){
                 return(getAllHelpControlListParams(NULL,rd[[i]]))
             }
         }

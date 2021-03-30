@@ -17,7 +17,7 @@ getServer <- function(input, output, session) {
 
         if(init){
             shinyjs::disable("resetData")
-            shinyjs::disable("evaluateData")
+            #shinyjs::disable("evaluateData")
             shinyjs::disable("proposeNewPoint")
             shinyjs::enable("runCreateDOE")
             shinyjs::enable("runSpotIter")
@@ -43,7 +43,7 @@ getServer <- function(input, output, session) {
     ))
 
     ## En-/Disables
-    shinyjs::disable("evaluateData")
+    #shinyjs::disable("evaluateData")
     shinyjs::disable("resetData")
     shinyjs::disable("proposeNewPoint")
 
@@ -106,6 +106,9 @@ getServer <- function(input, output, session) {
 
         localResult <- spotResult()
         x <- localResult$x
+        #browser()
+        colnames(localResult$x) <- paste0("X",1:ncol(x))
+
         y <- localResult$y
 
         if(input$objectiveFunction == "mInput"){
@@ -115,7 +118,19 @@ getServer <- function(input, output, session) {
                                       ,footer=NULL,easyClose=T))
                 return()
             }
-            localResult$modelFit <- buildModel(input,localResult)
+
+            tryCatch(expr = {
+                localResult$modelFit <- buildModel(input,localResult)}
+                , error = function(cond) {
+                    showModal(modalDialog(title="Configuration Error",
+                                          HTML(paste("There seems to be an error in your configuration.<br>
+                                                     There might be an issue in the configuration of your objective function<br>
+                                                     or there exists a wrong entry in the data table.<br>
+                                                     Please check for typos/misconfigurations
+                                                     <br><br>Original error message was:<br>",cond))
+                                          ,footer=NULL,easyClose=T))
+                    return()
+                })
         }else{
             if(!input$rLogMode){
                 tryCatch(expr = {
@@ -178,19 +193,23 @@ getServer <- function(input, output, session) {
             tryCatch(expr = {
                 ctrl <- getSpotControl(input)
                 funEvals <- ctrl$funEvals
+                stepsTodo <- funEvals - max(ctrl$designControl$size,length(localSpotResult$y)) + 1
                 bounds <- getBounds(input)
-                while(T){
-                    if(isTRUE(session$input$spotInterrupted)){
-                        break
-                    }
-                    if(!is.null(localSpotResult)){
-                        if(nrow(localSpotResult$x) >= funEvals){
+                withProgress(message = 'Calculation in progress', {
+                    while(T){
+                        if(isTRUE(session$input$spotInterrupted)){
                             break
                         }
+                        if(!is.null(localSpotResult)){
+                            if(nrow(localSpotResult$x) >= funEvals){
+                                break
+                            }
+                        }
+                        localSpotResult <- doSpotIter(input,localSpotResult,ctrl,bounds)
+                        incProgress(1/stepsTodo)
                     }
-                    localSpotResult <- doSpotIter(input,localSpotResult,ctrl,bounds)
-                    httpuv::service()
-                }
+                    })
+
             }, error = function(cond) {
                 showModal(modalDialog(title="Configuration Error",HTML(paste("There seems to be an error in your configuration.<br>
                                                                              SPOT was not able to run.<br>
@@ -221,6 +240,20 @@ getServer <- function(input, output, session) {
     observeEvent(input$resultTable,{
         if(!tableChangedByScript()){
             newData <- as.matrix(hot_to_r(input$resultTable))
+
+            newResult <- spotResult()
+            newResult$x <- newData[,1:getNDim(input)]
+            newResult$y <- newData[,ncol(newData)]
+
+            spotResult(newResult)
+        }
+
+        tableChangedByScript(F)
+    })
+
+    observeEvent(input$resultTableIE,{
+        if(!tableChangedByScript()){
+            newData <- as.matrix(hot_to_r(input$resultTableIE))
 
             newResult <- spotResult()
             newResult$x <- newData[,1:getNDim(input)]
@@ -351,6 +384,31 @@ getServer <- function(input, output, session) {
         }
     })
 
+    round_df <- function(df, digits) {
+        nums <- as.vector(is.na(df))
+        if(length(nums) == 0){
+            return(df)
+        }
+        for(i in 1:length(nums)){
+            if(!nums[i]){
+                row <- i%%nrow(df)
+                if(row == 0){
+                    row <- nrow(df)
+                }
+                col <- as.integer(i/nrow(df))+1
+                if(row == nrow(df)){
+                    col <- col -1
+                }
+                df[row,col] <- round(df[row,col], digits = digits)
+            }
+        }
+
+        for(i in 1:ncol(df)){
+            df[,i] <- as.numeric(df[,i])
+        }
+        df
+    }
+
     output$resultTable <- renderRHandsontable({
         req(spotResult())
         tableChangedByScript(T)
@@ -374,8 +432,35 @@ getServer <- function(input, output, session) {
         colNames <- c(colNames, "results")
         df <- data.frame(data)
         names(df) <- colNames
+        df <- round_df(df,3)
+        rhandsontable(df, stretchH = "all")
+    })
 
-        rhandsontable(round(df,3), stretchH = "all")
+    output$resultTableIE <- renderRHandsontable({
+        req(spotResult())
+        tableChangedByScript(T)
+        x <- spotResult()$x
+        y <- spotResult()$y
+
+        if(length(dim(x)) > 1){
+            len <- nrow(x)
+        }else{
+            len <- length(x)
+        }
+        if(len == length(y)){
+            data <- cbind(x,y)
+        }else{
+            data <- cbind(x,c(y,rep(NA,nrow(x)-length(y))))
+        }
+        colNames <- NULL
+        for(i in 1:(ncol(data)-1)){
+            colNames <- c(colNames, paste("x",i,sep=""))
+        }
+        colNames <- c(colNames, "results")
+        df <- data.frame(data)
+        names(df) <- colNames
+        df <- round_df(df,3)
+        rhandsontable(df, stretchH = "all")
     })
 
     output$bestFound <- renderUI({
@@ -419,6 +504,116 @@ getServer <- function(input, output, session) {
         shinyjs::enable("runCreateDOE")
         shinyjs::enable("runSpotIter")
         getUiSelectorXML("design",input)
+    })
+
+    spotResultToDF <- function(){
+        localResult <- spotResult()
+        if(is.null(localResult)){
+            return()
+        }
+        x <- localResult$x
+        y <- localResult$y
+
+        if(length(dim(x)) > 1){
+            len <- nrow(x)
+        }else{
+            len <- length(x)
+        }
+        if(len == length(y)){
+            data <- cbind(x,y)
+        }else{
+            data <- cbind(x,c(y,rep(NA,nrow(x)-length(y))))
+        }
+        colNames <- NULL
+        for(i in 1:(ncol(data)-1)){
+            colNames <- c(colNames, paste("x",i,sep=""))
+        }
+        colNames <- c(colNames, "results")
+        df <- data.frame(data)
+        names(df) <- colNames
+        df
+    }
+
+    observeEvent(c(input$removeEmptyTableRows,input$removeEmptyTableRowsIE),{
+        localResult <- spotResult()
+        df <- spotResultToDF()
+
+        if(is.null(df)){
+            return()
+        }
+
+        ind <- NULL
+        for(i in 1:nrow(df)){
+            row <- df[i,]
+            if(all(is.na(row))){
+                ind <- c(ind, i)
+            }
+        }
+        if(!is.null(ind)){
+            df <- df[-ind,]
+        }
+
+        localResult$x <- df[,-ncol(df)]
+        localResult$y <- df[,ncol(df)]
+
+        if(length(localResult$y) == 0){
+            spotResult(NULL)
+        }
+
+        spotResult(localResult)
+    })
+
+    #observeEvent(input$exportData,{
+    #    localResult <- spotResult()
+    #    if(is.null(localResult)){
+    #        showModal(modalDialog(title="Export Error",
+    #                              "There was no data to export"))
+    #        return()
+    #    }
+    #    volumes <- c("UserFolder"="~/")
+    #    shinyFiles::shinyFileSave(input, "exportData", roots=volumes, session=session)
+    #    fileinfo <- shinyFiles::parseSavePath(volumes, input$exportData)
+    #    df <- spotResultToDF()
+    #    if (nrow(fileinfo) > 0) {
+    #        utils::write.csv(df, as.character(fileinfo$datapath), row.names = F)
+    #    }
+    #})
+
+    output$downloadData <- downloadHandler(
+        filename = function() {
+            paste('data-', Sys.Date(), '.csv', sep='')
+        },
+        content = function(con) {
+            localResult <- spotResult()
+            if(is.null(localResult)){
+                showModal(modalDialog(title="Export Error",
+                                      "There was no data to export"))
+                return()
+            }
+            df <- spotResultToDF()
+            utils::write.csv(df, con, row.names = F)
+        })
+
+    observeEvent(input$importData,{
+        req(input$importData)
+        data <- utils::read.csv(input$importData$datapath)
+        localResult <- spotResult()
+        localResult$x <- unname(as.matrix(data[,-ncol(data)]))
+        localResult$y <- data[,ncol(data)]
+        spotResult(localResult)
+        shinyjs::enable("resetData")
+        shinyjs::enable("evaluateData")
+    })
+
+    observeEvent(c(input$addTableRow,input$addTableRowIE),{
+        localResult <- spotResult()
+        if(is.null(localResult$x)){
+            localResult$x <- matrix(rep(NA,getNDim(input)), ncol = getNDim(input))
+        }else{
+            localResult$x <- rbind(localResult$x, rep(NA,getNDim(input)))
+            localResult$y <- c(localResult$y,NA)
+        }
+        spotResult(localResult)
     })
 
     output$designUI <- renderUI({

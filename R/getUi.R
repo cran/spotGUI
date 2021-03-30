@@ -4,6 +4,8 @@
 #' This method is used internally in the starting process of the GUI.
 #' Manual use of this function is not advised.
 #'
+#' @import shinydashboard
+#'
 #' @export
 getUIPage <- function(){
     dashboardPage(
@@ -14,12 +16,14 @@ getUIPage <- function(){
         # Creation of Main Tabs
         dashboardSidebar(
             sidebarMenu(id = "tabs",
-                        menuItem("Objective function", tabName = "objectiveFunction"),
-                        menuItem("Spot Config", tabName = "spotConfig"),
-                        menuItem("Run Spot", tabName = "runMode"),
-                        menuItem("Exports", tabName = "exports")
+                        menuItem("Objective Function", tabName = "objectiveFunction"),
+                        menuItem("SPOT Configuration", tabName = "spotConfig"),
+                        menuItem("SPOT Evaluation", tabName = "runMode"),
+                        menuItem("Data Import/Export", tabName = "importExport"),
+                        menuItem("R-Log", tabName = "exports")
             )
         ),
+
 
         # Body Contents of each tab
         dashboardBody(
@@ -82,9 +86,15 @@ getUIPage <- function(){
                                 checkboxInput("rLogMode",label = "Log Only")
                             )
                         ),
+                        textOutput('textProcessing'),
+                        tags$head(tags$style("#textProcessing{color: red;
+                                             font-size: 20px;
+                                             font-style: italic;}")),
                         fluidRow(
                             uiOutput("bestFound"),
                             column(6,
+                                   actionButton("addTableRow", "+"),
+                                   actionButton("removeEmptyTableRows", "Remove Empty Rows"),
                                    rHandsontableOutput('resultTable')
                             ),
                             column(6,
@@ -92,6 +102,23 @@ getUIPage <- function(){
                                    uiOutput("variableSelectors"),
                                    plotlyOutput("resultModelPlot")
                             )
+                        )
+                ),
+
+                tabItem(tabName = "importExport",
+                        fluidRow(
+                            wellPanel(
+                                fileInput("importData", "Import Data", multiple = F),
+                                h5(strong("Export Data")),
+                                downloadLink('downloadData', 'Download')
+                                #shinyFiles::shinySaveButton("exportData", "Browse...", "Save file as ...",
+                                #                            filetype=list(csv="csv"))
+                            )
+                        ),
+                        actionButton("addTableRowIE", "+"),
+                        actionButton("removeEmptyTableRowsIE", "Remove Empty Rows"),
+                        fluidRow(
+                            rHandsontableOutput('resultTableIE')
                         )
                 ),
 
